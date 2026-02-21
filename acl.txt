@@ -1,0 +1,32 @@
+# ZFSguru Module ACL Configuration
+# This file defines access control lists for the ZFSguru Webmin module
+
+# Feature definitions
+feature_overview=Dashboard and system overview
+feature_pools=Pool creation, management, and administration
+feature_datasets=Dataset creation, management, and properties
+feature_snapshots=Snapshot creation, cloning, and management
+feature_disks=Disk monitoring, SMART data, and formatting
+feature_services=Services management (NFS, SMB, SSH, iSCSI)
+feature_access=Access control for shares and exports (SMB/NFS/SSH/iSCSI)
+feature_access_smb=Samba share access management
+feature_access_nfs=NFS export access management
+feature_access_ssh=SSH access information
+feature_access_iscsi=iSCSI access information
+feature_network=Network interfaces, ports, and firewall management
+feature_system=System preferences, CLI, updates, and shutdown controls
+feature_status=System status, health reports, and logs
+feature_acl=Access control configuration
+
+# Default access levels for roles
+role_admin=overview,pools,datasets,snapshots,disks,services,access,access_smb,access_nfs,access_ssh,access_iscsi,network,system,status,acl
+role_operator=overview,pools,datasets,snapshots,disks,services,access,access_smb,access_nfs,access_ssh,access_iscsi,network,system,status
+role_viewer=overview,status
+
+# User-specific ACLs (can be extended)
+# Format: user_username=feature1,feature2,feature3
+user_root=overview,pools,datasets,snapshots,disks,services,access,access_smb,access_nfs,access_ssh,access_iscsi,network,system,status,acl
+
+# Legacy compatibility flags
+can_view=1
+can_manage=1

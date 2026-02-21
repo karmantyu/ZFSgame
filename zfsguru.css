@@ -1,0 +1,874 @@
+/* Common CSS for ZFSguru module UI */
+
+.zfsguru-quickaccess {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.zfsguru-actionlinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.zfsguru-actionlinks .btn {
+  white-space: nowrap;
+}
+
+.zfsguru-quickaccess a.button {
+  padding: 6px 10px;
+  border-radius: 4px;
+  text-decoration: none;
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  color: inherit;
+  display: inline-block;
+}
+
+.zfsguru-quickaccess a.button:hover {
+  background: #f5f5f5;
+}
+
+.zfsguru-status-ok {
+  color: #0a8a0a;
+  font-weight: bold;
+}
+
+.zfsguru-status-warn {
+  color: #6b5600;
+  font-weight: bold;
+  background: #fff3b0;
+  border: 1px solid #e0c060;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.zfsguru-status-bad {
+  color: #a00000;
+  font-weight: bold;
+}
+
+.zfsguru-status-unknown {
+  color: #666;
+  font-weight: bold;
+}
+
+.zfsguru-link {
+  color: #0066cc;
+  text-decoration: underline;
+}
+
+.zfsguru-pool-nowrap {
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  display: inline-block;
+}
+
+.zfsguru-code-block {
+  background-color: #f0f0f0;
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  border-left: 4px solid #007acc;
+}
+
+.zfsguru-bar {
+  position: relative;
+  height: 16px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  background: #f6f6f6;
+  overflow: hidden;
+  min-width: 160px;
+}
+
+.zfsguru-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007acc, #3aa0e6);
+}
+
+.zfsguru-bar-fill-ok {
+  background: linear-gradient(90deg, #007acc, #3aa0e6);
+}
+
+.zfsguru-bar-fill-warn {
+  background: linear-gradient(90deg, #d07a00, #f0b000);
+}
+
+.zfsguru-bar-fill-bad {
+  background: linear-gradient(90deg, #a00000, #d04040);
+}
+
+.zfsguru-bar-text {
+  position: absolute;
+  inset: 0;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  color: #111;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+
+.zfsguru-danger-block {
+  background: #f8f0f0;
+  padding: 12px;
+  margin: 10px 0;
+  border-left: 4px solid #cc0000;
+  font-family: monospace;
+}
+
+.zfsguru-warn-block {
+  background: #fff8c6;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #e0c060;
+}
+
+.zfsguru-text-bad {
+  color: #a00;
+  font-weight: bold;
+}
+
+.zfsguru-muted {
+  color: #999;
+}
+
+.zfsguru-table-full {
+  width: 100%;
+}
+
+.zfsguru-margin-top {
+  margin-top: 12px;
+}
+
+.zfsguru-margin-top-lg {
+  margin-top: 15px;
+}
+
+.zfsguru-msg {
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+}
+
+.zfsguru-msg-error {
+  color: #a00;
+  border: 1px solid #a00;
+}
+
+.zfsguru-msg-success {
+  color: #080;
+  border: 1px solid #080;
+}
+
+.zfsguru-delete-btn {
+  background: #cc0000 !important;
+  border: 1px solid #990000 !important;
+  color: #fff !important;
+  padding: 2px 10px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.zfsguru-delete-btn:hover {
+  background: #a80000 !important;
+  border-color: #7f0000 !important;
+}
+
+.zfsguru-tabs {
+  margin: 10px 0 18px 0;
+}
+
+.zfsguru-tab {
+  display: inline-block;
+  padding: 8px 12px;
+  margin-right: 8px;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 2px solid #ddd;
+  border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+}
+
+.zfsguru-tab-active {
+  font-weight: bold;
+  border-bottom: 3px solid #007acc;
+  background: #f5f9fd;
+}
+
+.zfsguru-status-badge {
+  display: inline-block;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.zfsguru-status-note {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: none;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.zfsguru-pmap {
+  display: flex;
+  border: 1px solid #ccc;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.zfsguru-pmap-seg {
+  display: block;
+  border-right: 1px solid #ccc;
+  text-decoration: none;
+  color: #333;
+  font-size: 10px;
+  line-height: 36px;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: #e6eef7;
+}
+
+.zfsguru-pmap-seg:hover {
+  background: #dce8f7;
+}
+
+.zfsguru-pmap-selected {
+  outline: 2px solid #0074d9;
+  outline-offset: -2px;
+}
+
+.zfsguru-pmap-free {
+  background: #f6f6f6;
+  color: #666;
+}
+
+.zfsguru-pmap-unpartitioned {
+  background: #ffffff;
+  color: #666;
+}
+
+.zfsguru-pmap-geom {
+  background: #e9f7ee;
+}
+
+.zfsguru-hidden {
+  display: none;
+}
+
+/* Dashboard header and quick-access refresh */
+.zfsguru-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #d7dbe0;
+  border-radius: 5px;
+  background: #f7fafc;
+  max-width: 780px;
+}
+
+.zfsguru-hero-icon-wrap {
+  width: 72px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #bfc8d3;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #eef3f8;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.zfsguru-hero-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+
+.zfsguru-hero-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0b2f4d;
+  line-height: 1.2;
+}
+
+.zfsguru-hero-subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #52657a;
+}
+
+.zfsguru-pool-link {
+  font-weight: 700;
+  color: #0a4b95;
+}
+
+.zfsguru-pool-link:hover {
+  color: #073562;
+}
+
+.zfsguru-quickaccess-panel {
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid #d7dbe0;
+  border-radius: 6px;
+  background: #f9fbfd;
+}
+
+.zfsguru-quickaccess-head {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0b2f4d;
+  margin-bottom: 8px;
+}
+
+.zfsguru-quickaccess-group {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #d4dde7;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.zfsguru-quickaccess-group:last-child {
+  margin-bottom: 0;
+}
+
+.zfsguru-quickaccess-title {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #445366;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.zfsguru-qa-btn,
+.zfsguru-quickaccess-panel a.zfsguru-qa-btn {
+  display: inline-block;
+  min-width: 160px;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 5px;
+  text-decoration: none;
+  border: 1px solid #9eb0c4;
+  background: linear-gradient(to bottom, #fefefe, #dfe8f2);
+  color: #0f365b;
+  font-weight: 600;
+  font-size: 12px;
+  box-shadow: 0 2px 0 #9eb0c4, 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+}
+
+.zfsguru-qa-btn:hover,
+.zfsguru-quickaccess-panel a.zfsguru-qa-btn:hover {
+  background: linear-gradient(to bottom, #ffffff, #d3e1ee);
+  box-shadow: 0 2px 0 #8da2b8, 0 3px 8px rgba(0, 0, 0, 0.11);
+  transform: translateY(-1px);
+}
+
+.zfsguru-qa-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #8da2b8, 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Dashboard */
+.zfsguru-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 8px 0 14px 0;
+}
+
+.zfsguru-dash-stat {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fafafa;
+  padding: 10px 12px;
+}
+
+.zfsguru-dash-stat-label {
+  color: #666;
+  font-size: 12px;
+}
+
+.zfsguru-dash-stat-value {
+  margin-top: 2px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #111;
+}
+
+.zfsguru-pool-picker {
+  margin: 8px 0 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fbfbfb;
+}
+
+.zfsguru-pool-picker form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.zfsguru-pool-picker label {
+  font-weight: 600;
+  color: #333;
+}
+
+.zfsguru-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 10px;
+  margin: 8px 0 10px 0;
+}
+
+.zfsguru-pool-card {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.zfsguru-pool-card-empty {
+  color: #777;
+  font-style: italic;
+}
+
+.zfsguru-pool-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.zfsguru-pool-name {
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  color: #0a4b95;
+}
+
+.zfsguru-pool-name:hover {
+  text-decoration: underline;
+}
+
+.zfsguru-health-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid #bbb;
+  text-transform: uppercase;
+}
+
+.zfsguru-health-ok {
+  color: #075f2b;
+  background: #e8f7ef;
+  border-color: #7dc89d;
+}
+
+.zfsguru-health-warn {
+  color: #7a5600;
+  background: #fff5d8;
+  border-color: #ddbf6a;
+}
+
+.zfsguru-health-bad {
+  color: #7f1d1d;
+  background: #fdecec;
+  border-color: #e29c9c;
+}
+
+.zfsguru-pool-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 4px 10px;
+  margin: 0 0 8px 0;
+  font-size: 12px;
+}
+
+.zfsguru-pool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.zfsguru-mini-btn {
+  display: inline-block;
+  padding: 5px 8px;
+  border: 1px solid #cfcfcf;
+  border-radius: 4px;
+  text-decoration: none;
+  color: #222;
+  background: #f7f7f7;
+  font-size: 12px;
+}
+
+.zfsguru-mini-btn:hover {
+  background: #ededed;
+}
+
+.zfsguru-qa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.zfsguru-qa-card {
+  display: block;
+  text-decoration: none;
+  border: 1px solid #d5d5d5;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+.zfsguru-qa-card:hover {
+  background: #f5f8fb;
+  border-color: #b5c9dd;
+}
+
+/* Stacked bars (CPU / Memory breakdown charts) */
+.zfsguru-stackbar {
+  display: flex;
+  height: 18px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  background: #f6f6f6;
+  overflow: hidden;
+  min-width: 160px;
+}
+
+.zfsguru-stackbar-seg {
+  height: 100%;
+}
+
+.zfsguru-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 6px 0 0 0;
+  font-size: 11px;
+}
+
+.zfsguru-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zfsguru-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #999;
+  border-radius: 2px;
+  background: #ccc;
+}
+
+/* CPU segments */
+.zfsguru-stackbar-seg-cpu-user,
+.zfsguru-legend-swatch-cpu-user { background: #2b8cbe; }
+.zfsguru-stackbar-seg-cpu-nice,
+.zfsguru-legend-swatch-cpu-nice { background: #7bccc4; }
+.zfsguru-stackbar-seg-cpu-system,
+.zfsguru-legend-swatch-cpu-system { background: #045a8d; }
+.zfsguru-stackbar-seg-cpu-interrupt,
+.zfsguru-legend-swatch-cpu-interrupt { background: #fdae61; }
+.zfsguru-stackbar-seg-cpu-idle,
+.zfsguru-legend-swatch-cpu-idle { background: #e0e0e0; }
+
+/* Memory segments */
+.zfsguru-stackbar-seg-mem-wired,
+.zfsguru-legend-swatch-mem-wired { background: #d73027; }
+.zfsguru-stackbar-seg-mem-active,
+.zfsguru-legend-swatch-mem-active { background: #1a9850; }
+.zfsguru-stackbar-seg-mem-inactive,
+.zfsguru-legend-swatch-mem-inactive { background: #91cf60; }
+.zfsguru-stackbar-seg-mem-cache,
+.zfsguru-legend-swatch-mem-cache { background: #4575b4; }
+.zfsguru-stackbar-seg-mem-laundry,
+.zfsguru-legend-swatch-mem-laundry { background: #74add1; }
+.zfsguru-stackbar-seg-mem-other,
+.zfsguru-legend-swatch-mem-other { background: #bdbdbd; }
+.zfsguru-stackbar-seg-mem-free,
+.zfsguru-legend-swatch-mem-free { background: #e0e0e0; }
+
+/* Live VMStat mini trend chart */
+.zfsguru-vmstat-trend-wrap {
+  margin: 6px 0 12px 0;
+  max-width: 620px;
+}
+
+.zfsguru-vmstat-trend-svg {
+  width: 100%;
+  height: auto;
+  border: 1px solid #d7dce2;
+  border-radius: 5px;
+  background: #ffffff !important;
+  display: block;
+}
+
+.zfsguru-vmstat-trend-bg {
+  fill: #fbfcfe;
+}
+
+.zfsguru-vmstat-trend-grid {
+  stroke: #e2e7ee;
+  stroke-width: 1;
+}
+
+.zfsguru-vmstat-trend-grid-v {
+  stroke-dasharray: 3 3;
+}
+
+.zfsguru-vmstat-trend-axis {
+  fill: #5b6774;
+  font-size: 11px;
+  font-family: Arial, sans-serif;
+}
+
+.zfsguru-vmstat-trend-table {
+  margin-top: 6px;
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 440px;
+  font-size: 11px;
+}
+
+.zfsguru-vmstat-trend-table th,
+.zfsguru-vmstat-trend-table td {
+  border: 1px solid #d7dce2;
+  padding: 4px 6px;
+  text-align: left;
+  background: #fff;
+}
+
+.zfsguru-vmstat-trend-table th {
+  background: #f3f6fa;
+  font-weight: 700;
+}
+
+.zfsguru-vmstat-trend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.zfsguru-livevmstat-panel {
+  margin: 6px 0 10px 0;
+  padding: 8px 10px;
+  border: 1px solid #d7dce2;
+  border-radius: 5px;
+  background: #fbfcfe;
+}
+
+.zfsguru-livevmstat-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.zfsguru-livevmstat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3b4b5a;
+}
+
+.zfsguru-livevmstat-field select {
+  min-width: 72px;
+}
+
+.zfsguru-livevmstat-device-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.zfsguru-livevmstat-quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.zfsguru-livevmstat-mini-btn {
+  font-size: 11px;
+  padding: 2px 7px;
+  line-height: 1.2;
+}
+
+.zfsguru-livevmstat-device-item {
+  border: 1px solid #d7dce2;
+  border-radius: 4px;
+  padding: 3px 5px 4px 5px;
+  background: #fff;
+  min-width: 56px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.zfsguru-livevmstat-device-head {
+  display: block;
+}
+
+.zfsguru-livevmstat-device-busy {
+  display: block;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--trend-color, #4b5d70);
+  text-align: center;
+}
+
+.zfsguru-livevmstat-device-stripe {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  margin-top: 1px;
+  background: var(--trend-color, #4b5d70);
+}
+
+.zfsguru-livevmstat-device-main {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2b3947;
+  white-space: nowrap;
+}
+
+.zfsguru-livevmstat-device-main .zfsguru-trend-dev-cb {
+  margin: 0;
+}
+
+.zfsguru-livevmstat-device-name {
+  display: inline-block;
+}
+
+.zfsguru-livevmstat-actions {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+}
+
+.zfsguru-livevmstat-actions-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zfsguru-livevmstat-main-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  gap: 10px;
+  align-items: start;
+  margin-top: 8px;
+}
+
+.zfsguru-livevmstat-main-col {
+  min-width: 0;
+}
+
+.zfsguru-livevmstat-cardtitle {
+  margin: 0 0 6px 0;
+  font-size: 14px;
+  color: #1f2f40;
+}
+
+.zfsguru-livevmstat-details {
+  margin-top: 8px;
+  max-width: 920px;
+}
+
+.zfsguru-livevmstat-details > summary {
+  cursor: pointer;
+  color: #0a4b95;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+@media (max-width: 1200px) {
+  .zfsguru-livevmstat-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* README renderer */
+.zfsguru-readme-rendered {
+  max-width: 980px;
+  line-height: 1.5;
+}
+
+.zfsguru-readme-rendered h1,
+.zfsguru-readme-rendered h2,
+.zfsguru-readme-rendered h3,
+.zfsguru-readme-rendered h4 {
+  margin: 12px 0 6px 0;
+  color: #163a5f;
+}
+
+.zfsguru-readme-rendered h1 { font-size: 22px; }
+.zfsguru-readme-rendered h2 { font-size: 18px; }
+.zfsguru-readme-rendered h3 { font-size: 15px; }
+.zfsguru-readme-rendered h4 { font-size: 13px; }
+
+.zfsguru-readme-rendered p {
+  margin: 6px 0;
+}
+
+.zfsguru-readme-list {
+  margin: 6px 0 8px 22px;
+}
+
+.zfsguru-readme-list li {
+  margin: 2px 0;
+}
+
+.zfsguru-readme-hr {
+  border: 0;
+  border-top: 1px solid #d7dce2;
+  margin: 10px 0;
+}

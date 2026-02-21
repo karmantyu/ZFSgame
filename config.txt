@@ -1,0 +1,81 @@
+# ZFSguru Webmin Module Configuration File
+
+# Command Paths - Override default locations if needed
+zpool_cmd=/sbin/zpool
+zfs_cmd=/sbin/zfs
+geom_cmd=/sbin/geom
+gstat_cmd=/usr/sbin/gstat
+mdconfig_cmd=/sbin/mdconfig
+mount_cmd=/sbin/mount
+umount_cmd=/sbin/umount
+tar_cmd=/usr/bin/tar
+cp_cmd=/bin/cp
+mv_cmd=/bin/mv
+rm_cmd=/bin/rm
+chmod_cmd=/bin/chmod
+chown_cmd=/usr/sbin/chown
+find_cmd=/usr/bin/find
+sysctl_cmd=/sbin/sysctl
+glabel_cmd=/sbin/glabel
+gpart_cmd=/sbin/gpart
+camcontrol_cmd=/sbin/camcontrol
+dd_cmd=/bin/dd
+smartctl_cmd=/usr/local/sbin/smartctl
+newfs_cmd=/sbin/newfs
+blkdiscard_cmd=/sbin/blkdiscard
+# ATA secure erase (camcontrol wrapper)
+ata_secure_erase_cmd=/bin/sh
+ata_secure_erase_args=./scripts/ata_secure_erase_camcontrol.sh
+ata_secure_erase_pass=zfsguru
+ata_secure_erase_mode=normal
+swapctl_cmd=/sbin/swapctl
+swapon_cmd=/sbin/swapon
+swapoff_cmd=/sbin/swapoff
+logger_cmd=/usr/bin/logger
+
+# Logging
+log_file=/var/log/webmin/zfsguru.log
+log_level=info
+
+# UI Settings
+theme=default
+animation_effects=1
+auto_refresh=0
+auto_refresh_interval=30
+
+# Advanced Options
+advanced_mode=1
+enable_benchmarking=1
+enable_smart_monitoring=1
+enable_system_update_ui=0
+
+# System Integration
+enable_nfs=1
+enable_samba=1
+enable_ssh=1
+enable_iscsi=1
+
+# Security
+require_confirmation_for_pool_create=1
+require_confirmation_for_disk_format=1
+require_confirmation_for_pool_export=1
+
+# Performance
+cache_pool_status=1
+cache_dataset_list=1
+cache_duration=60
+
+# Monitoring
+monitor_pool_capacity_threshold=80
+monitor_alert_high_capacity=90
+monitor_disk_temperature_warning=45
+monitor_disk_temperature_critical=55
+
+# Backup/Snapshot defaults
+default_snapshot_naming=backup_%Y%m%d_%H%M%S
+default_compression=lz4
+default_ashift=12
+
+# Legacy compatibility flags
+can_view=1
+can_manage=1

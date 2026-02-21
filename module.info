@@ -1,0 +1,11 @@
+desc=ZFSguru
+longdesc=Comprehensive ZFS storage management for Webmin. Manage pools, datasets, snapshots, disks, and services with an intuitive web interface. Includes SMART monitoring and service integration.
+category=system
+depends=
+usermin=
+os_support=freebsd
+version=0.1.0 beta
+author=karmantyu
+authorurl=https://github.com/karmantyu/ZFSgame
+license=BSD
+webminversion=1.700
