@@ -1479,6 +1479,241 @@ sub pool_needs_attention {
     return (0, $status);
 }
 
+sub parse_zpool_status_details {
+    my ($txt) = @_;
+    $txt = '' unless defined $txt;
+
+    my %info = (
+        pool       => '',
+        state      => '',
+        status     => '',
+        action     => '',
+        see        => '',
+        errors     => '',
+        scan_lines => [],
+        scan_text  => '',
+        config_rows => [],
+        config_raw  => [],
+    );
+
+    my $section = '';
+    for my $line (split /\n/, $txt) {
+        if ($line =~ /^\s*pool:\s*(\S+)/) {
+            $info{pool} = $1;
+            $section = '';
+            next;
+        }
+        if ($line =~ /^\s*state:\s*(.+?)\s*$/) {
+            $info{state} = $1;
+            $section = '';
+            next;
+        }
+        if ($line =~ /^\s*status:\s*(.*?)\s*$/) {
+            $info{status} = $1;
+            $section = 'status';
+            next;
+        }
+        if ($line =~ /^\s*action:\s*(.*?)\s*$/) {
+            $info{action} = $1;
+            $section = 'action';
+            next;
+        }
+        if ($line =~ /^\s*see:\s*(.*?)\s*$/) {
+            $info{see} = $1;
+            $section = '';
+            next;
+        }
+        if ($line =~ /^\s*scan:\s*(.*?)\s*$/) {
+            push @{ $info{scan_lines} }, $1 if defined $1;
+            $section = 'scan';
+            next;
+        }
+        if ($line =~ /^\s*config:\s*$/) {
+            $section = 'config';
+            next;
+        }
+        if ($line =~ /^\s*errors:\s*(.*?)\s*$/) {
+            $info{errors} = $1;
+            $section = '';
+            next;
+        }
+
+        if ($section eq 'status' || $section eq 'action' || $section eq 'scan') {
+            if ($line =~ /^\s+/ && $line !~ /^\s*(?:pool|state|status|action|see|scan|config|errors):/i) {
+                (my $cont = $line) =~ s/^\s+//;
+                if (length $cont) {
+                    if ($section eq 'scan') {
+                        push @{ $info{scan_lines} }, $cont;
+                    } else {
+                        $info{$section} .= ' ' if length $info{$section};
+                        $info{$section} .= $cont;
+                    }
+                }
+                next;
+            }
+            $section = '';
+        }
+
+        if ($section eq 'config') {
+            next if $line =~ /^\s*$/;
+            push @{ $info{config_raw} }, $line;
+            next if $line =~ /^\s*NAME\s+STATE\s+READ\s+WRITE\s+CKSUM\s*$/i;
+
+            if ($line =~ /^(\s*)(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$/) {
+                push @{ $info{config_rows} }, {
+                    kind   => 'node',
+                    indent => length($1),
+                    name   => $2,
+                    state  => uc($3),
+                    read   => $4,
+                    write  => $5,
+                    cksum  => $6,
+                };
+                next;
+            }
+
+            if ($line =~ /^(\s*)(\S+)\s*$/) {
+                push @{ $info{config_rows} }, {
+                    kind   => 'group',
+                    indent => length($1),
+                    name   => $2,
+                };
+                next;
+            }
+
+            push @{ $info{config_rows} }, {
+                kind => 'raw',
+                raw  => $line,
+            };
+        }
+    }
+
+    for my $key (qw(status action see errors)) {
+        $info{$key} = '' unless defined $info{$key};
+        $info{$key} =~ s/\s+/ /g;
+        $info{$key} =~ s/^\s+|\s+$//g;
+    }
+    $info{scan_text} = join(' ', grep { defined($_) && $_ ne '' } @{ $info{scan_lines} });
+    $info{scan_text} =~ s/\s+/ /g;
+    $info{scan_text} =~ s/^\s+|\s+$//g;
+
+    return \%info;
+}
+
+sub parse_scrub_scan_metrics {
+    my ($scan_lines) = @_;
+    my @lines = ref($scan_lines) eq 'ARRAY'
+        ? grep { defined($_) && $_ ne '' } @$scan_lines
+        : ();
+
+    my %scan = (
+        raw_lines => \@lines,
+        summary   => '',
+        time      => '',
+        time_label => '',
+        scanned   => '',
+        scan_rate => '',
+        issued    => '',
+        issue_rate => '',
+        repaired  => '',
+        progress_pct => '',
+        progress_num => undef,
+        eta       => '',
+    );
+
+    return \%scan unless @lines;
+
+    my $headline = $lines[0];
+    if ($headline =~ /^(.*)\s+since\s+(.+?)\s*$/i) {
+        $scan{summary} = $1;
+        $scan{time} = $2;
+        $scan{time_label} = 'Started';
+    } elsif ($headline =~ /^(.*)\s+on\s+(.+?)\s*$/i) {
+        $scan{summary} = $1;
+        $scan{time} = $2;
+        $scan{time_label} = 'Completed';
+    } else {
+        $scan{summary} = $headline;
+    }
+
+    if (@lines > 1 && $lines[1] =~ /^(.+?)\s+scanned at\s+([^,]+),\s+(.+?)\s+issued at\s+(.+?)\s*$/i) {
+        $scan{scanned} = $1;
+        $scan{scan_rate} = $2;
+        $scan{issued} = $3;
+        $scan{issue_rate} = $4;
+    }
+
+    if (@lines > 2) {
+        if ($lines[2] =~ /^(.+?)\s+repaired,\s+([0-9]+(?:\.[0-9]+)?)%\s+done,\s+(.+?)\s+to go\s*$/i) {
+            $scan{repaired} = $1;
+            $scan{progress_pct} = $2 . '%';
+            $scan{progress_num} = $2 + 0;
+            $scan{eta} = $3;
+        } elsif ($lines[2] =~ /^(.+?)\s+repaired(?:,|\s*$)/i) {
+            $scan{repaired} = $1;
+        }
+    }
+
+    for my $key (qw(summary time scanned scan_rate issued issue_rate repaired progress_pct eta)) {
+        $scan{$key} = '' unless defined $scan{$key};
+        $scan{$key} =~ s/\s+/ /g;
+        $scan{$key} =~ s/^\s+|\s+$//g;
+    }
+
+    return \%scan;
+}
+
+sub scrub_health_html {
+    my ($state) = @_;
+    $state = '' unless defined $state;
+    my $text = $state ne '' ? uc($state) : L("VALUE_UNKNOWN");
+    my $class =
+          $text eq 'ONLINE' ? 'zfsguru-status-ok'
+        : $text =~ /^(?:DEGRADED|FAULTED|OFFLINE|UNAVAIL|REMOVED|SUSPENDED)$/ ? 'zfsguru-status-bad'
+        : $text =~ /^(?:AVAIL|INUSE)$/ ? 'zfsguru-status-warn'
+        : 'zfsguru-status-unknown';
+    return "<span class='$class'>" . &html_escape($text) . "</span>";
+}
+
+sub scrub_errors_html {
+    my ($errors) = @_;
+    $errors = '' unless defined $errors;
+    $errors =~ s/\s+/ /g;
+    $errors =~ s/^\s+|\s+$//g;
+    my $text = $errors ne '' ? $errors : L("VALUE_UNKNOWN");
+    my $class =
+          $text eq L("VALUE_UNKNOWN") ? 'zfsguru-status-unknown'
+        : $text =~ /no known data errors/i ? 'zfsguru-status-ok'
+        : 'zfsguru-status-bad';
+    return "<span class='$class'>" . &html_escape($text) . "</span>";
+}
+
+sub scrub_progress_bar_html {
+    my ($pct) = @_;
+    return &html_escape(L("VALUE_UNKNOWN")) unless defined $pct && $pct =~ /^\d+(?:\.\d+)?$/;
+    $pct = 0 if $pct < 0;
+    $pct = 100 if $pct > 100;
+    my $pct_txt = sprintf("%.2f%%", $pct);
+    my $fill_cls = $pct >= 100 ? 'zfsguru-bar-fill zfsguru-bar-fill-ok' : 'zfsguru-bar-fill zfsguru-bar-fill-warn';
+    return "<div class='zfsguru-bar' title='" . &html_escape($pct_txt) . "'>" .
+           "<div class='$fill_cls' style='width: $pct%'></div>" .
+           "<div class='zfsguru-bar-text'>" . &html_escape($pct_txt) . "</div>" .
+           "</div>";
+}
+
+sub scrub_topology_cell_html {
+    my ($row, $base_indent) = @_;
+    my $name = ref($row) eq 'HASH' ? ($row->{name} || $row->{raw} || '') : '';
+    my $kind = ref($row) eq 'HASH' ? ($row->{kind} || '') : '';
+    my $indent = ref($row) eq 'HASH' ? ($row->{indent} || 0) : 0;
+    my $depth = ($indent > $base_indent) ? int(($indent - $base_indent) / 2) : 0;
+    my $pad = $depth * 18;
+    my $style = "display:inline-block;padding-left:${pad}px;font-family:monospace;";
+    $style .= "font-weight:bold;" if $depth == 0 || $kind eq 'group';
+    $style .= "color:#555;" if $kind eq 'group' || $kind eq 'raw';
+    return "<span style='$style'>" . &html_escape($name) . "</span>";
+}
+
 sub action_replace {
     my $pool_name = $in{'pool'};
     die "Invalid pool name" unless is_pool_name($pool_name);
@@ -1582,7 +1817,7 @@ sub action_scrub {
     my $do_stop  = $in{'stop_scrub'}  ? 1 : 0;
 
     if ($do_start || $do_stop) {
-        my $stop = $do_stop ? 1 : 0;
+        my $stop = $do_stop ? 'stop' : undef;
         eval {
             zpool_scrub($pool_name, $stop);
             log_info("Scrub " . ($stop ? "stopped" : "started") . " on pool $pool_name");
@@ -1595,17 +1830,83 @@ sub action_scrub {
     }
     
     my $status_text = zpool_status($pool_name);
-    my $scan_status = L("STATUS_NO_SCRUB");
-    if (defined $status_text && $status_text =~ /^\s*scan:\s+(.+)$/m) {
-        $scan_status = $1;
-    }
     print &ui_subheading(L("SUB_SCRUB_MANAGEMENT", $pool_name));
     print_pool_action_help(
         what    => "Starts or stops data scrub on the pool.",
         benefit => "Detects/corrects latent checksum errors early.",
         risk    => "Can increase disk load and impact performance during scrub."
     );
-    print L("LBL_CURRENT_STATUS") . ": " . &html_escape($scan_status) . "<br><br>";
+
+    if (!defined $status_text) {
+        print &ui_print_error(L("ERR_POOL_STATUS_FAILED"));
+    } else {
+        my $details = parse_zpool_status_details($status_text);
+        my $scan = parse_scrub_scan_metrics($details->{scan_lines});
+        my @scan_lines = @{ $details->{scan_lines} || [] };
+        my $scan_summary = $scan->{summary} || (@scan_lines ? $scan_lines[0] : L("STATUS_NO_SCRUB"));
+        my $scan_status_html = &html_escape($scan_summary);
+        my $scan_details_html = '';
+        if (@scan_lines > 1 && !$scan->{scanned} && !$scan->{issued} && !$scan->{repaired} && !$scan->{eta}) {
+            $scan_details_html = join("<br>", map { &html_escape($_) } @scan_lines[1 .. $#scan_lines]);
+        }
+
+        print &ui_table_start("Scrub Overview", "width=100%", 2);
+        print &ui_table_row("Pool", &html_escape($details->{pool} || $pool_name));
+        print &ui_table_row("Pool state", scrub_health_html($details->{state}));
+        print &ui_table_row(L("LBL_CURRENT_STATUS"), $scan_status_html);
+        print &ui_table_row("Scan details", $scan_details_html) if $scan_details_html ne '';
+        print &ui_table_row($scan->{time_label}, &html_escape($scan->{time})) if $scan->{time_label} && $scan->{time};
+        print &ui_table_row("Progress", scrub_progress_bar_html($scan->{progress_num})) if defined $scan->{progress_num};
+        print &ui_table_row("Scanned", &html_escape($scan->{scanned} . ($scan->{scan_rate} ? " at $scan->{scan_rate}" : '')))
+            if $scan->{scanned} || $scan->{scan_rate};
+        print &ui_table_row("Issued", &html_escape($scan->{issued} . ($scan->{issue_rate} ? " at $scan->{issue_rate}" : '')))
+            if $scan->{issued} || $scan->{issue_rate};
+        print &ui_table_row("Repaired", &html_escape($scan->{repaired})) if $scan->{repaired};
+        print &ui_table_row("ETA", &html_escape($scan->{eta} . " to go")) if $scan->{eta};
+        print &ui_table_row("Status detail", &html_escape($details->{status})) if $details->{status};
+        print &ui_table_row("Recommended action", &html_escape($details->{action})) if $details->{action};
+        print &ui_table_row("Data errors", scrub_errors_html($details->{errors}));
+        print &ui_table_end();
+
+        my @config_rows = grep { ref($_) eq 'HASH' && $_->{kind} ne 'raw' } @{ $details->{config_rows} || [] };
+        if (@config_rows) {
+            my $base_indent;
+            for my $row (@config_rows) {
+                next unless defined $row->{indent};
+                $base_indent = $row->{indent} if !defined($base_indent) || $row->{indent} < $base_indent;
+            }
+            $base_indent = 0 unless defined $base_indent;
+
+            my @heads = ("Topology", "State", "Read", "Write", "CKSUM");
+            my @data;
+            for my $row (@config_rows) {
+                if ($row->{kind} eq 'group') {
+                    push @data, [
+                        scrub_topology_cell_html($row, $base_indent),
+                        '',
+                        '',
+                        '',
+                        '',
+                    ];
+                    next;
+                }
+                push @data, [
+                    scrub_topology_cell_html($row, $base_indent),
+                    scrub_health_html($row->{state}),
+                    &html_escape($row->{read} // ''),
+                    &html_escape($row->{write} // ''),
+                    &html_escape($row->{cksum} // ''),
+                ];
+            }
+
+            print &ui_columns_table(\@heads, 100, \@data, undef, 1, "Device Health", L("VALUE_NONE"));
+        }
+
+        print "<details class='zfsguru-margin-top'>";
+        print "<summary>Full zpool status</summary>";
+        print "<pre class='zfsguru-code-block'>" . &html_escape($status_text) . "</pre>";
+        print "</details>";
+    }
     
     print &ui_form_start("advanced_pools.cgi", "post");
     print &ui_hidden("action", "scrub");

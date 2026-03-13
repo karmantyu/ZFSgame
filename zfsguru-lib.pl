@@ -742,7 +742,18 @@ sub zpool_add_log { my ($p,@d)=@_; my ($rc,$out,$err)=run_cmd($ZPOOL,'add',$p,'l
 sub zpool_add_spare { my ($p,@d)=@_; my ($rc,$out,$err)=run_cmd($ZPOOL,'add',$p,'spare',@d); die $err if $rc!=0; 1; }
 sub zpool_replace { my ($p,$o,$n)=@_; my ($rc,$out,$err)=run_cmd($ZPOOL,'replace',$p,$o,$n); die $err if $rc!=0; 1; }
 sub zpool_remove { my ($p,$d)=@_; my ($rc,$out,$err)=run_cmd($ZPOOL,'remove',$p,$d); die $err if $rc!=0; 1; }
-sub zpool_scrub { my ($p,$m)=@_; my @cmd=($ZPOOL,'scrub'); push @cmd,'-s' if defined($m)&&$m eq 'stop'; push @cmd,$p; my ($rc,$out,$err)=run_cmd(@cmd); die $err if $rc!=0; 1; }
+sub zpool_scrub {
+  my ($p,$m)=@_;
+  my @cmd=($ZPOOL,'scrub');
+  if (defined($m)) {
+    my $v = ref($m) ? $m : lc($m);
+    push @cmd,'-s' if $v eq 'stop' || $v eq '1' || $v eq 'true' || $v eq 'yes' || $v eq 'on';
+  }
+  push @cmd,$p;
+  my ($rc,$out,$err)=run_cmd(@cmd);
+  die $err if $rc!=0;
+  1;
+}
 sub zpool_export { my ($p)=@_; my ($rc,$out,$err)=run_cmd($ZPOOL,'export',$p); die $err if $rc!=0; 1; }
 sub zpool_upgrade { my ($p)=@_; my ($rc,$out,$err)=run_cmd($ZPOOL,'upgrade',$p); die $err if $rc!=0; 1; }
 sub zpool_import {
