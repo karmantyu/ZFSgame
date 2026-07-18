@@ -136,3 +136,7 @@ Some systems/OpenZFS versions do not support `zpool rename` directly. Use export
 - Job log/result actions (`View Log`, `Kill Job`, `View Results`)
 - Live VMStat trend page with device selection and auto-refresh controls
 - UI/navigation refinements and return-link consistency improvements
+
+### 0.1.1 beta
+
+- Added filesystem traversal option and other small chages for zfsaclmanager function

@@ -89,10 +89,15 @@ sub _build_run_context_html
     my $profile = $opt{profile} || 'MEDIA';
     my $base_owner = $opt{base_owner} || '';
     my $base_group = $opt{base_group} || '';
+    my $custom_mode_file = $opt{custom_mode_file} || '';
+    my $custom_mode_dir = $opt{custom_mode_dir} || '';
+    my $jail_uid = $opt{jail_uid} || '';
+    my $jail_gid = $opt{jail_gid} || '';
+    my $cross_mounts = $opt{cross_mounts} ? 1 : 0;
 
     my $info = detect_target_info($target);
-    my ($mode_dir, $mode_file) = profile_modes($profile);
-    my $run_modes = "dir=$mode_dir file=$mode_file";
+    my ($mode_dir, $mode_file) = profile_modes($profile, $custom_mode_file, $custom_mode_dir);
+    my $run_modes = "file=$mode_file dir=$mode_dir";
 
     my $disp_uid = $info->{posix_uid};
     my $disp_gid = $info->{posix_gid};
@@ -103,6 +108,12 @@ sub _build_run_context_html
     if ($base_group) {
         my $g = getgrnam($base_group);
         $disp_gid = $g if (defined $g);
+    }
+    elsif (($profile eq 'JAILMEDIA' || $profile eq 'JAILEXEC') && $jail_gid =~ /^[0-9]+$/) {
+        $disp_gid = $jail_gid;
+    }
+    if (!$base_owner && ($profile eq 'JAILMEDIA' || $profile eq 'JAILEXEC') && $jail_uid =~ /^[0-9]+$/) {
+        $disp_uid = $jail_uid;
     }
     my $posix_base = (defined $disp_uid && $disp_uid ne '' && defined $disp_gid && $disp_gid ne '') ?
         $disp_uid."/".$disp_gid : 'N/A';
@@ -125,6 +136,14 @@ sub _build_run_context_html
         $info->{mountpoint} ? &html_escape($info->{mountpoint}) : 'N/A');
     $html .= &ui_table_row($text{'aclm_profile'}, &html_escape($profile));
     $html .= &ui_table_row($text{'aclm_posix_modes'}, &html_escape($run_modes));
+    $html .= &ui_table_row($text{'aclm_cross_mounts'} || 'Traverse across mount points',
+        $cross_mounts ? ($text{'VALUE_YES'} || 'Yes') : ($text{'VALUE_NO'} || 'No'));
+    if ($jail_uid ne '') {
+        $html .= &ui_table_row($text{'aclm_jail_uid'} || 'Jail UID', &html_escape($jail_uid));
+    }
+    if ($jail_gid ne '') {
+        $html .= &ui_table_row($text{'aclm_jail_gid'} || 'Jail GID', &html_escape($jail_gid));
+    }
     $html .= &ui_table_row($text{'aclm_posix_base'}, $posix_cell);
     my $acl_lines = get_acl_base_lines($target);
     if ($acl_lines && @$acl_lines) {
@@ -202,7 +221,12 @@ if ($in{'poll'} && $in{'job'}) {
             mode       => ($in{'mode'} || ''),
             profile    => ($in{'profile'} || 'MEDIA'),
             base_owner => $base_owner || '',
-            base_group => $base_group || ''
+            base_group => $base_group || '',
+            custom_mode_file => ($in{'custom_mode_file'} || ''),
+            custom_mode_dir  => ($in{'custom_mode_dir'} || ''),
+            jail_uid => ($in{'jail_uid'} || ''),
+            jail_gid => ($in{'jail_gid'} || ''),
+            cross_mounts => ($in{'cross_mounts'} ? 1 : 0)
         );
         $json .= ",\"context_html\":\""._json_escape($ctx)."\"";
     }
@@ -267,11 +291,16 @@ if (defined $pid && $pid == 0) {
         mode       => $mode,
         users      => ($in{'users'} || ''),
         recursive  => $in{'recursive'} ? 1 : 0,
+        cross_mounts => $in{'cross_mounts'} ? 1 : 0,
         dry_run    => $in{'dryrun'} ? 1 : 0,
         snapshot   => $in{'snapshot'} ? 1 : 0,
         profile    => $run_profile,
         base_owner => $base_owner || '',
         base_group => $base_group || '',
+        custom_mode_file => ($in{'custom_mode_file'} || ''),
+        custom_mode_dir  => ($in{'custom_mode_dir'} || ''),
+        jail_uid => ($in{'jail_uid'} || ''),
+        jail_gid => ($in{'jail_gid'} || ''),
         rights     => ($in{'rights'} || ''),
         write      => ($in{'write'} || 0),
         delete     => ($in{'delete'} || 0),
@@ -294,11 +323,16 @@ if (!defined $pid) {
         mode       => $mode,
         users      => ($in{'users'} || ''),
         recursive  => $in{'recursive'} ? 1 : 0,
+        cross_mounts => $in{'cross_mounts'} ? 1 : 0,
         dry_run    => $in{'dryrun'} ? 1 : 0,
         snapshot   => $in{'snapshot'} ? 1 : 0,
         profile    => $run_profile,
         base_owner => $base_owner || '',
         base_group => $base_group || '',
+        custom_mode_file => ($in{'custom_mode_file'} || ''),
+        custom_mode_dir  => ($in{'custom_mode_dir'} || ''),
+        jail_uid => ($in{'jail_uid'} || ''),
+        jail_gid => ($in{'jail_gid'} || ''),
         rights     => ($in{'rights'} || ''),
         write      => ($in{'write'} || 0),
         delete     => ($in{'delete'} || 0),
@@ -316,7 +350,12 @@ if (!defined $pid) {
         mode       => $mode,
         profile    => $run_profile,
         base_owner => $base_owner || '',
-        base_group => $base_group || ''
+        base_group => $base_group || '',
+        custom_mode_file => ($in{'custom_mode_file'} || ''),
+        custom_mode_dir  => ($in{'custom_mode_dir'} || ''),
+        jail_uid => ($in{'jail_uid'} || ''),
+        jail_gid => ($in{'jail_gid'} || ''),
+        cross_mounts => ($in{'cross_mounts'} ? 1 : 0)
     );
 }
 else {
@@ -330,6 +369,11 @@ else {
     my $js_profile = _js_escape($run_profile);
     my $js_owner = _js_escape($base_owner || '');
     my $js_group = _js_escape($base_group || '');
+    my $js_custom_file = _js_escape($in{'custom_mode_file'} || '');
+    my $js_custom_dir = _js_escape($in{'custom_mode_dir'} || '');
+    my $js_jail_uid = _js_escape($in{'jail_uid'} || '');
+    my $js_jail_gid = _js_escape($in{'jail_gid'} || '');
+    my $js_cross = _js_escape($in{'cross_mounts'} ? 1 : 0);
     print "<script>\n".
           "var runJob = '"._js_escape($job_id)."';\n".
           "var runDone = false;\n".
@@ -340,6 +384,11 @@ else {
               "'&profile='+encodeURIComponent('".$js_profile."')+".
               "'&base_owner='+encodeURIComponent('".$js_owner."')+".
               "'&base_group='+encodeURIComponent('".$js_group."')+".
+              "'&custom_mode_file='+encodeURIComponent('".$js_custom_file."')+".
+              "'&custom_mode_dir='+encodeURIComponent('".$js_custom_dir."')+".
+              "'&jail_uid='+encodeURIComponent('".$js_jail_uid."')+".
+              "'&jail_gid='+encodeURIComponent('".$js_jail_gid."')+".
+              "'&cross_mounts='+encodeURIComponent('".$js_cross."')+".
               "'&keep_logs='+encodeURIComponent('".($keep_logs ? 1 : 0)."');\n".
           "function _lastLine(t){\n".
           "  if(!t) return '';\n".
