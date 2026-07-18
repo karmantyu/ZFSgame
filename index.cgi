@@ -1,189 +1,783 @@
-#!/usr/bin/env perl
+#!/usr/local/bin/perl
+use strict;
+use warnings;
+require './zfsaclmanager-lib.pl';
+our (%in, %text);
 
-package main;
-
-
-use FindBin qw($Bin);
-use lib "$Bin/..";
-use WebminCore;
-init_config();
-eval { require './ZFSguru-lib.pl'; 1 } || require './zfsguru-lib.pl';
-zfsguru_lib->import();
-require './zfsguru_i18n.pl';
-require 'ui-lib.pl';
-
-# Parse CGI params
-zfsguru_readparse();
-main::zfsguru_init('en');
-
-main::zfsguru_page_header(title_key => "TITLE_DASHBOARD");
-
-eval { acl_require_feature('overview'); };
-if ($@) {
-    print &ui_print_error(main::L("ERR_ACCESS_DENIED_FEATURE", 'overview'));
-    main::zfsguru_page_footer(url => "/");
-    exit 0;
+&ReadParse();
+my $target_dataset = $in{'target_dataset'} || '';
+my $target_path = $in{'target_path'} || '';
+my $target = $in{'target'} || '';
+$target_dataset =~ s/^\s+|\s+$//g;
+$target_path =~ s/^\s+|\s+$//g;
+$target =~ s/^\s+|\s+$//g;
+if ($target eq '') {
+    if ($target_path ne '') {
+        $target = $target_path;
+    }
+    elsif ($target_dataset ne '') {
+        $target = $target_dataset;
+    }
 }
+my $update_error = '';
+my $info;
 
-print "<div style='display:flex;align-items:center;gap:14px;margin:8px 0 12px 0;padding:10px 12px;border:1px solid #d7dbe0;border-radius:6px;background:#f7fafc;max-width:680px'>\n";
-print "  <div style='width:192px;height:144px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;border:1px solid #bfc8d3;border-radius:4px;background:#fff;overflow:hidden;box-shadow:inset 0 0 0 1px #eef3f8'>\n";
-print "    <img src='images/zfsguru_4_3.jpg' alt='ZFSguru' style='width:100%;height:100%;object-fit:cover;display:block'>\n";
-print "  </div>\n";
-print "  <div>\n";
-print "    <div style='font-size:20px;font-weight:700;color:#0b2f4d;line-height:1.2'>" . main::L("SUB_DASHBOARD") . "</div>\n";
-print "    <div style='margin-top:2px;font-size:13px;color:#52657a'>Pools, datasets and services at a glance.</div>\n";
-print "  </div>\n";
-print "</div>\n";
-
-my $pools = zpool_list();
-
-my @qa_storage = (
-    [ 'advanced_pools.cgi?action=list',    main::L("QA_POOL_MANAGEMENT") ],
-    [ 'advanced_datasets.cgi?action=list', main::L("QA_DATASET_MANAGEMENT") ],
-    [ 'disks.cgi?action=list',             main::L("QA_DISKS_HARDWARE") ],
-    [ 'zfsaclmanager.cgi',                 main::L("QA_ZFS_ACL_MANAGER") ],
-);
-my @qa_services = (
-    [ 'services.cgi?action=manage',    main::L("QA_SERVICES") ],
-    [ 'network.cgi?action=interfaces', main::L("QA_NETWORK") ],
-    [ 'system.cgi?action=preferences', main::L("QA_SYSTEM") ],
-    [ 'status.cgi?action=overview',    main::L("QA_SYSTEM_OVERVIEW") ],
-);
-my @qa_access = (
-    [ 'access.cgi?action=smb_shares', main::L("QA_ACCESS") ],
-    [ 'acl.cgi?action=view',          main::L("QA_ACCESS_CONTROL") ],
-    [ 'system.cgi?action=preferences&prefs_tab=config', main::L("QA_SYSTEM_PREFERENCES") ],
-    [ 'uefi.cgi?action=list',         main::L("QA_UEFI_ESP") ],
-);
-
-print "<div class='zfsguru-quickaccess-panel'>\n";
-print "  <div class='zfsguru-quickaccess-head'>\n";
-print "    <span>" . main::L("SUB_QUICK_ACCESS") . "</span>\n";
-print "  </div>\n";
-
-print "  <div class='zfsguru-quickaccess-group'>\n";
-print "    <div class='zfsguru-quickaccess-title'>" . main::L("QA_GROUP_STORAGE") . "</div>\n";
-print "    <div class='zfsguru-quickaccess'>\n";
-print join("\n", map { my ($u,$l)=@$_; qq(<a class="zfsguru-qa-btn" href=").&html_escape($u).qq(">).&html_escape($l).qq(</a>) } @qa_storage) . "\n";
-print "    </div>\n";
-print "  </div>\n";
-
-print "  <div class='zfsguru-quickaccess-group'>\n";
-print "    <div class='zfsguru-quickaccess-title'>" . main::L("QA_GROUP_SERVICES") . "</div>\n";
-print "    <div class='zfsguru-quickaccess'>\n";
-print join("\n", map { my ($u,$l)=@$_; qq(<a class="zfsguru-qa-btn" href=").&html_escape($u).qq(">).&html_escape($l).qq(</a>) } @qa_services) . "\n";
-print "    </div>\n";
-print "  </div>\n";
-
-print "  <div class='zfsguru-quickaccess-group'>\n";
-print "    <div class='zfsguru-quickaccess-title'>" . main::L("QA_GROUP_ACCESS") . "</div>\n";
-print "    <div class='zfsguru-quickaccess'>\n";
-print join("\n", map { my ($u,$l)=@$_; qq(<a class="zfsguru-qa-btn" href=").&html_escape($u).qq(">).&html_escape($l).qq(</a>) } @qa_access) . "\n";
-print "    </div>\n";
-print "  </div>\n";
-print "</div>\n";
-
-print &ui_hr();
-
-print &ui_table_start(main::L("TABLE_POOLS_SUMMARY"), "width=100% style='max-width:680px'", 2);
-my $pool_count = scalar(@$pools) || 0;
-print &ui_table_span("<b>" . &html_escape(main::L("ROW_TOTAL_POOLS")) . ":</b> " . &html_escape($pool_count));
-if (@$pools) {
-    my @pool_blocks;
-    for my $p (@$pools) {
-        my $name = $p->{name} || '';
-        next unless length $name;
-        my $pool_url = "advanced_pools.cgi?action=view&pool=" . &url_encode($name);
-        my $pool_link = &ui_link($pool_url, &html_escape($name), "zfsguru-pool-link");
-
-        my $health = uc($p->{health} || 'UNKNOWN');
-        my ($needs_attention, $attention_msg) = pool_needs_attention($name, $health);
-        my $health_html;
-        if ($needs_attention && $health eq 'ONLINE') {
-            my $safe_msg = &html_escape($attention_msg || '');
-            my $title_attr = $safe_msg ne '' ? " title='$safe_msg'" : '';
-            $health_html = "<span class='zfsguru-status-warn zfsguru-status-badge'$title_attr>" .
-                           "ONLINE<br><span class='zfsguru-status-note'>Action required!</span></span>";
-        } else {
-            my $health_cls =
-                $health eq 'ONLINE' ? 'zfsguru-status-ok' :
-                $health eq 'DEGRADED' ? 'zfsguru-status-warn' :
-                $health eq 'UNKNOWN' ? 'zfsguru-status-unknown' :
-                'zfsguru-status-bad';
-            $health_html = "<span class='$health_cls'>" . &html_escape($health) . "</span>";
+if ($in{'update_state'}) {
+    if ($target ne '') {
+        my $zfs_opts = zfs_prop_options();
+        foreach my $p (keys %$zfs_opts) {
+            my $k = "zfs_".$p;
+            if (defined $in{$k} && $in{$k} ne '') {
+                state_set($k, $in{$k});
+            }
         }
-
-        my $info = "<span style='display:inline-block;max-width:300px'>" .
-                   &html_escape($p->{size} || '-') .
-                   " / " . &html_escape($p->{alloc} || '-') .
-                   " / " . &html_escape($p->{free} || '-') .
-                   " / " . $health_html .
-                   "</span>";
-        push @pool_blocks,
-            "<div style='margin:0 0 12px 0'>" .
-            "<div>" . $pool_link . "</div>" .
-            "<div style='margin-top:2px'>" . $info . "</div>" .
-            "</div>";
+        if (defined $in{'base_owner'}) {
+            my @bo = _sanitize_user_list($in{'base_owner'});
+            state_set('base_owner', join(' ', @bo));
+        }
+        if (defined $in{'base_group'}) {
+            my @bg = _sanitize_user_list($in{'base_group'});
+            state_set('base_group', join(' ', @bg));
+        }
+        state_save();
     }
-
-    if (@pool_blocks) {
-        my $half = int((scalar(@pool_blocks) + 1) / 2);
-        my $left_col  = join('', @pool_blocks[0 .. $half - 1]);
-        my $right_col = $half < scalar(@pool_blocks)
-            ? join('', @pool_blocks[$half .. $#pool_blocks])
-            : '&nbsp;';
-        my $two_col_html =
-            "<div style='display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:24px'>" .
-            "<div>$left_col</div>" .
-            "<div>$right_col</div>" .
-            "</div>";
-        print &ui_table_row('', $two_col_html);
-    } else {
-        print &ui_table_row("", main::L("ERR_NO_POOLS_READABLE"));
-    }
-} else {
-    print &ui_table_row("", main::L("ERR_NO_POOLS_READABLE"));
+    print "Content-type: text/plain\n\nOK\n";
+    exit;
 }
+
+if ($in{'update_acl_users'}) {
+    if ($target ne '') {
+        my $info_local = detect_target_info($target);
+        if (!$info_local->{exists}) {
+            print "Content-type: text/plain\n\nERROR: target missing\n";
+            exit;
+        }
+        if (!$info_local->{dataset}) {
+            print "Content-type: text/plain\n\nERROR: dataset not found\n";
+            exit;
+        }
+        my $current_acl = get_acl_users_for_dataset($info_local->{dataset});
+        my ($current_users, $current_juid, $current_jgid, $current_custom_file, $current_custom_dir) = parse_acl_users_prop($current_acl);
+        my $val = $in{'acl_users_set'} || '';
+        my @safe_acl_users = _sanitize_user_list($val);
+        my $safe_val = join(' ', @safe_acl_users);
+        my $prop_val = build_acl_users_prop_value($safe_val, $current_juid, $current_jgid, $current_custom_file, $current_custom_dir);
+        set_acl_users_for_dataset($info_local->{dataset}, $prop_val);
+        state_set('target', $target);
+        state_set('acl_users', $prop_val);
+        state_save();
+    }
+    print "Content-type: text/plain\n\nOK\n";
+    exit;
+}
+
+if ($target ne '') {
+    $info = detect_target_info($target);
+    if ($in{'update_props'}) {
+        if (!$info->{exists}) {
+            $update_error = $text{'target_missing'};
+        }
+        elsif (!$info->{dataset}) {
+            $update_error = $text{'err_dataset'} || 'Dataset not found for target';
+        }
+        else {
+            set_profile_for_dataset($info->{dataset}, $in{'profile_set'});
+            if (defined $in{'acl_users_set'} || defined $in{'jail_uid'} || defined $in{'jail_gid'} || defined $in{'custom_mode_file'} || defined $in{'custom_mode_dir'}) {
+                my $acl_users_val = $in{'acl_users_set'} || '';
+                my $jail_uid = $in{'jail_uid'} || '';
+                my $jail_gid = $in{'jail_gid'} || '';
+                my $custom_mode_file = $in{'custom_mode_file'} || '';
+                my $custom_mode_dir = $in{'custom_mode_dir'} || '';
+                my $prop_val = build_acl_users_prop_value($acl_users_val, $jail_uid, $jail_gid, $custom_mode_file, $custom_mode_dir);
+                set_acl_users_for_dataset($info->{dataset}, $prop_val);
+            }
+            my $zfs_opts = zfs_prop_options();
+            foreach my $p (keys %$zfs_opts) {
+                my $k = "zfs_".$p;
+                if (defined $in{$k} && $in{$k} ne '') {
+                    set_zfs_prop_for_dataset($info->{dataset}, $p, $in{$k});
+                }
+            }
+            $info = detect_target_info($target);
+        }
+    }
+}
+
+&ui_print_header(undef, $text{'title'}, "");
+
+my $about_html = "<div style='float:right;max-width:45%;color:#555;font-size:90%'>".
+    "<b>About ZFS ACL Manager</b><br>".
+    "Manages and audits NFSv4 ACLs on ZFS datasets and paths. ".
+    "Applies baseline ACLs, adds/removes user ACEs, and can enforce ".
+    "recommended ZFS ACL properties. Tested on FreeBSD.".
+    "</div>";
+print $about_html;
+my $ver = (defined $text{'module_version'} && $text{'module_version'} ne '') ?
+    $text{'module_version'} : (our $MODULE_VERSION || '');
+if ($ver ne '') {
+    print "<div style='margin-top:2px;color:#666'>Version: ".&html_escape($ver)."</div>";
+}
+print "<div style='clear:both'></div>";
+
+print &ui_form_start('index.cgi', 'get', undef, "onsubmit='return zfsacl_target_submit(this)' ");
+print &ui_table_start($text{'target_title'}, undef, 2);
+my @dataset_opts = ( [ '', '-- Select dataset mountpoint --' ] );
+my %seen_dataset;
+my $zfs_ds = _run_cmd("zfs list -H -o name,mountpoint -t filesystem");
+foreach my $line (split(/\n/, $zfs_ds || '')) {
+    next if ($line =~ /^\s*$/);
+    my ($ds, $mp) = split(/\s+/, $line, 2);
+    next if (!defined $ds || !defined $mp);
+    $ds =~ s/^\s+|\s+$//g;
+    $mp =~ s/^\s+|\s+$//g;
+    next if ($ds eq '' || $mp eq '' || $mp eq '-' || $mp eq 'none');
+    next if ($seen_dataset{$mp}++);
+    push @dataset_opts, [ $mp, $ds." (".$mp.")" ];
+}
+my $dataset_selected = $target_dataset ne '' ? $target_dataset : '';
+if ($dataset_selected eq '' && $target ne '') {
+    foreach my $opt (@dataset_opts) {
+        next if (!$opt || !ref($opt) || !$opt->[0]);
+        if ($opt->[0] eq $target) {
+            $dataset_selected = $target;
+            last;
+        }
+    }
+}
+my $manual_selected = $target_path ne '' ? $target_path : $target;
+if ($dataset_selected ne '' && $target_path eq '') {
+    $manual_selected = '';
+}
+print &ui_table_row($text{'target_dataset'} || 'Dataset / Filesystem',
+    &ui_select('target_dataset', $dataset_selected, \@dataset_opts, 1, 0, 0, 0,
+        "onchange='zfsacl_target_update(this.form, \"dataset\")'"));
+print &ui_table_row($text{'target_manual'} || 'Directory / File path (manual or browse)',
+    &ui_filebox('target_path', $manual_selected, 60, 0, undef,
+        "onchange='zfsacl_target_update(this.form, \"manual\")'"));
+print &ui_table_row($text{'target'}, "<span style='color:#666'>".
+    &html_escape($text{'target_hint'} || 'Manual path overrides dataset selection when both are set.')."</span>");
 print &ui_table_end();
+print &ui_form_end([ [ 'detect', $text{'detect'} ] ]);
 
-main::zfsguru_page_footer(url => "/");
+if ($target ne '') {
+    $info ||= detect_target_info($target);
+    print &ui_form_start('index.cgi', 'post', undef,
+        "onsubmit='return zfsacl_update_submit(this)'");
+    print &ui_hidden('target', $info->{target});
+    print &ui_hidden('update_props', 1);
+    print &ui_table_start($text{'target_info'}, undef, 2);
+    if (!$info->{exists}) {
+        print &ui_table_row($text{'errors'},
+            &html_escape($text{'target_missing'}).": ".&html_escape($target));
+        print &ui_table_end();
+        print &ui_form_end();
+        &ui_print_footer('/', $text{'title'});
+        exit;
+    }
 
-sub pool_needs_attention {
-    my ($pool_name, $health) = @_;
-    return (0, '') unless defined $pool_name && is_pool_name($pool_name);
-    return (1, 'Pool health is not ONLINE') if defined($health) && $health ne '' && $health ne 'ONLINE';
+    my $posix_base = 'N/A';
+    my $owner_name = '';
+    my $group_name = '';
+    if ($info->{posix_uid} ne '') {
+        $owner_name = getpwuid($info->{posix_uid}) || '';
+    }
+    if ($info->{posix_gid} ne '') {
+        $group_name = getgrgid($info->{posix_gid}) || '';
+    }
 
-    my ($rc, $out, $err) = run_cmd(($zfsguru_lib::ZPOOL || '/sbin/zpool'), 'status', $pool_name);
-    return (0, '') if $rc != 0 || !$out;
+    if ($update_error ne '') {
+        print &ui_table_row($text{'errors'}, &html_escape($update_error));
+    }
 
-    my $state = '';
-    my $status = '';
-    my $in_status = 0;
-    for my $line (split /\n/, $out) {
-        if ($line =~ /^\s*state:\s*(.+?)\s*$/i) {
-            $state = $1;
-            next;
+    my $state_target = state_get('target', '');
+    my $force_refresh = $in{'refresh'} ? 1 : 0;
+    my $use_state = ($state_target && $state_target eq $target && !$force_refresh) ? 1 : 0;
+    my $has_ds = $info->{dataset} ? 1 : 0;
+    my $saved_profile = $use_state ? state_get('profile', '') : '';
+    my $profile_sel = '';
+    if ($info->{dataset}) {
+        $profile_sel = $info->{profile} || 'MEDIA';
+    }
+    else {
+        $profile_sel = $saved_profile ? $saved_profile : 'MEDIA';
+    }
+    if ($profile_sel !~ /^(?:MEDIA|EXEC|JAILMEDIA|JAILEXEC)$/) {
+        $profile_sel = 'MEDIA';
+    }
+    my @profile_set_opts = (
+        [ 'MEDIA',     $text{'profile_media'} ],
+        [ 'EXEC',      $text{'profile_exec'} ],
+        [ 'JAILMEDIA', $text{'profile_jailmedia'} ],
+        [ 'JAILEXEC',  $text{'profile_jailexec'} ],
+    );
+    my $profile_select = &ui_select(
+        'profile_set', $profile_sel, \@profile_set_opts, 1, 0, 0,
+        $has_ds ? 0 : 1,
+        "onchange='zfsacl_update_modes()'"
+    );
+
+    my $mode_str = "file=".$info->{mode_file}." dir=".$info->{mode_dir};
+    my $posix_modes_html = "<span id='posix_modes_val'>".&html_escape($mode_str)."</span>";
+
+    my @acl_selected = ();
+    my $acl_source = $info->{acl_users};
+    my $jail_uid = '';
+    my $jail_gid = '';
+    my $custom_mode_file = '';
+    my $custom_mode_dir = '';
+    if (!$acl_source && $use_state) {
+        $acl_source = state_get('acl_users', '');
+    }
+    if ($acl_source) {
+        ($acl_source, $jail_uid, $jail_gid, $custom_mode_file, $custom_mode_dir) = parse_acl_users_prop($acl_source);
+        @acl_selected = _sanitize_user_list($acl_source);
+    }
+    if ($custom_mode_file eq '' && defined $info->{mode_file} && $info->{mode_file} ne '') {
+        $custom_mode_file = $info->{mode_file};
+    }
+    if ($custom_mode_dir eq '' && defined $info->{mode_dir} && $info->{mode_dir} ne '') {
+        $custom_mode_dir = $info->{mode_dir};
+    }
+    my %acl_seen = map { $_ => 1 } @acl_selected;
+    my $smb_users = list_samba_users();
+    my @acl_left_opts = map { [ $_, format_user_label($_, user_uid_for_name($_)) ] } @acl_selected;
+    my @acl_right_list = grep { !$acl_seen{$_} } @$smb_users;
+    my @acl_right_opts = map { [ $_, format_user_label($_, user_uid_for_name($_)) ] } @acl_right_list;
+    my $acl_left = &ui_select(
+        'acl_users_left', [], \@acl_left_opts, 8, 1, 0, $has_ds ? 0 : 1,
+        "style='min-width:200px' ondblclick='acl_users_move(this.form,0);'"
+    );
+    my $acl_right = &ui_select(
+        'acl_users_right', [], \@acl_right_opts, 8, 1, 0, $has_ds ? 0 : 1,
+        "style='min-width:200px' ondblclick='acl_users_move(this.form,1);'"
+    );
+    my $acl_select = "<table class='ui_multi_select'><tr class='ui_multi_select_heads'>".
+        "<td><b>$text{'acl_users_policy'}</b></td><td></td><td><b>$text{'samba_users'}</b></td></tr>".
+        "<tr class='ui_multi_select_row'><td>$acl_left</td><td></td><td>$acl_right</td></tr></table>".
+        &ui_hidden('acl_users_set', join("\n", @acl_selected));
+    my $jail_info_html = '';
+    if ($jail_uid ne '' || $jail_gid ne '') {
+        my @jail_info = ();
+        if ($jail_uid ne '') {
+            my $jail_name = getpwuid($jail_uid);
+            $jail_name = '-' if (!defined $jail_name || $jail_name eq '');
+            push @jail_info, 'Jail UID: '.format_user_label($jail_name, $jail_uid);
         }
-        if ($line =~ /^\s*status:\s*(.*?)\s*$/i) {
-            $status = $1;
-            $in_status = 1;
-            next;
+        if ($jail_gid ne '') {
+            my $jail_name = getgrgid($jail_gid);
+            $jail_name = '-' if (!defined $jail_name || $jail_name eq '');
+            push @jail_info, 'Jail GID: '.format_group_label($jail_name, $jail_gid);
         }
-        if ($in_status) {
-            last if $line =~ /^\s*(?:action|scan|config|errors|see):/i;
-            last if $line =~ /^\S/;
-            $line =~ s/^\s+//;
-            $status .= " $line" if length $line;
+        $jail_info_html = "<div style='margin-top:6px;color:#666;font-size:90%'><b>Extra</b><br>".
+            &html_escape(join(' / ', @jail_info))."</div>";
+    }
+
+    my $saved_owner = $use_state ? state_get('base_owner', '') : '';
+    my $saved_group = $use_state ? state_get('base_group', '') : '';
+    my @base_owner_sel = _sanitize_user_list($in{'base_owner'} || $saved_owner || $owner_name);
+    my @base_group_sel = _sanitize_user_list($in{'base_group'} || $saved_group || $group_name);
+    my $sys_users = list_system_users();
+    my $sys_groups = list_system_groups();
+    my %owner_seen = map { $_ => 1 } @base_owner_sel;
+    my %group_seen = map { $_ => 1 } @base_group_sel;
+    my @owner_left_opts = map { [ $_, format_user_label($_, user_uid_for_name($_)) ] } @base_owner_sel;
+    my @group_left_opts = map { [ $_, format_group_label($_, group_gid_for_name($_)) ] } @base_group_sel;
+    my @owner_right_list = grep { !$owner_seen{$_} } @$sys_users;
+    my @group_right_list = grep { !$group_seen{$_} } @$sys_groups;
+    my @owner_right_opts = map { [ $_, format_user_label($_, user_uid_for_name($_)) ] } @owner_right_list;
+    my @group_right_opts = map { [ $_, format_group_label($_, group_gid_for_name($_)) ] } @group_right_list;
+    my $owner_left = &ui_select(
+        'base_owner_left', [], \@owner_left_opts, 3, 1, 0, 0,
+        "style='min-width:200px;height:6em' ondblclick='base_owner_move(this.form,0);'"
+    );
+    my $owner_right = &ui_select(
+        'base_owner_right', [], \@owner_right_opts, 3, 1, 0, 0,
+        "style='min-width:200px;height:6em' ondblclick='base_owner_move(this.form,1);'"
+    );
+    my $owner_select = "<table class='ui_multi_select'><tr class='ui_multi_select_heads'>".
+        "<td><b>$text{'base_owner_title'}</b></td><td></td><td><b>$text{'system_users'}</b></td></tr>".
+        "<tr class='ui_multi_select_row'><td>$owner_left</td><td></td><td>$owner_right</td></tr></table>".
+        &ui_hidden('base_owner', join("\n", @base_owner_sel));
+    my $group_left = &ui_select(
+        'base_group_left', [], \@group_left_opts, 3, 1, 0, 0,
+        "style='min-width:200px;height:6em' ondblclick='base_group_move(this.form,0);'"
+    );
+    my $group_right = &ui_select(
+        'base_group_right', [], \@group_right_opts, 3, 1, 0, 0,
+        "style='min-width:200px;height:6em' ondblclick='base_group_move(this.form,1);'"
+    );
+    my $group_select = "<table class='ui_multi_select'><tr class='ui_multi_select_heads'>".
+        "<td><b>$text{'base_group_title'}</b></td><td></td><td><b>$text{'system_groups'}</b></td></tr>".
+        "<tr class='ui_multi_select_row'><td>$group_left</td><td></td><td>$group_right</td></tr></table>".
+        &ui_hidden('base_group', join("\n", @base_group_sel));
+
+    print &ui_table_row($text{'target'}, &html_escape($info->{target}));
+    print &ui_table_row($text{'detected_type'}, &html_escape($info->{type}));
+    print &ui_table_row($text{'dataset'},
+        $info->{dataset} ? &html_escape($info->{dataset}) : 'N/A');
+    print &ui_table_row($text{'mountpoint'},
+        $info->{mountpoint} ? &html_escape($info->{mountpoint}) : 'N/A');
+    print &ui_table_row($text{'profile'}, $profile_select);
+    print &ui_table_row($text{'posix_modes'}, $posix_modes_html);
+    my $jail_row_style = '';
+    my $jail_uid_input = &ui_textbox('jail_uid', $jail_uid, 8, 0, 10,
+        "onchange='profile_update_props(this.form, document.getElementById(\'profile_set\').value)' ");
+    my $jail_gid_input = &ui_textbox('jail_gid', $jail_gid, 8, 0, 10,
+        "onchange='profile_update_props(this.form, document.getElementById(\'profile_set\').value)' ");
+    print "<tr id='jail_uid_row' style='$jail_row_style'><td>".&html_escape($text{'jail_uid'})."</td><td>$jail_uid_input <span style='color:#666;font-size:90%;margin-left:8px'>".&html_escape($text{'extra_jail_uid'})."</span></td></tr>";
+    print "<tr id='jail_gid_row' style='$jail_row_style'><td>".&html_escape($text{'jail_gid'})."</td><td>$jail_gid_input <span style='color:#666;font-size:90%;margin-left:8px'>".&html_escape($text{'extra_jail_gid'})."</span></td></tr>";
+    
+    # Custom POSIX modes fields
+    my $file_ph = (defined $info->{mode_file} && $info->{mode_file} ne '') ? $info->{mode_file} : '644';
+    my $dir_ph  = (defined $info->{mode_dir}  && $info->{mode_dir}  ne '') ? $info->{mode_dir}  : '755';
+    my $dir_hint = $dir_ph eq '2775' ? '2775 (setgid dir)' : $dir_ph;
+    my $file_hint = $file_ph;
+    my $custom_mode_file_input = &ui_textbox('custom_mode_file', $custom_mode_file, 6, 0, 3,
+        "onchange='zfsacl_update_modes()' oninput='this.dataset.userEdited=\"1\"' placeholder='$file_hint' title='Current profile file mode' style='font-weight:600;color:#0b5fff;background:#f4f8ff;border-color:#8fb6ff' ");
+    my $custom_mode_dir_input = &ui_textbox('custom_mode_dir', $custom_mode_dir, 6, 0, 3,
+        "onchange='zfsacl_update_modes()' oninput='this.dataset.userEdited=\"1\"' placeholder='$dir_hint' title='Current profile directory mode' style='font-weight:600;color:#0b5fff;background:#f4f8ff;border-color:#8fb6ff' ");
+    print "<tr id='custom_mode_file_row'><td>".&html_escape($text{'custom_mode_file'})."</td><td>$custom_mode_file_input <span style='color:#666;font-size:90%;margin-left:8px'>".&html_escape($text{'extra_custom_modes'})."</span></td></tr>";
+    print "<tr id='custom_mode_dir_row'><td>".&html_escape($text{'custom_mode_dir'})."</td><td>$custom_mode_dir_input <span style='color:#666;font-size:90%;margin-left:8px'>".&html_escape($text{'extra_custom_modes'})."</span></td></tr>";
+    my $disp_uid = $info->{posix_uid};
+    my $disp_gid = $info->{posix_gid};
+    if ($base_owner_sel[0]) {
+        my $u = getpwnam($base_owner_sel[0]);
+        $disp_uid = $u if (defined $u);
+    }
+    if ($base_group_sel[0]) {
+        my $g = getgrnam($base_group_sel[0]);
+        $disp_gid = $g if (defined $g);
+    }
+    if (defined $disp_uid && $disp_uid ne '' && defined $disp_gid && $disp_gid ne '') {
+        $posix_base = $disp_uid."/".$disp_gid;
+    }
+    my $disp_owner_name = '';
+    my $disp_group_name = '';
+    if ($base_owner_sel[0]) {
+        $disp_owner_name = $base_owner_sel[0];
+    }
+    elsif (defined $disp_uid && $disp_uid ne '') {
+        $disp_owner_name = getpwuid($disp_uid) || $owner_name || '';
+    }
+    if ($base_group_sel[0]) {
+        $disp_group_name = $base_group_sel[0];
+    }
+    elsif (defined $disp_gid && $disp_gid ne '') {
+        $disp_group_name = getgrgid($disp_gid) || $group_name || '';
+    }
+    my $eff_label = $text{'effective_uid_gid'} || 'effective uid/gid';
+    my $posix_base_html = "<span style='color:#666;font-size:90%'>".
+        &html_escape($eff_label).":</span> ".
+        &html_escape($posix_base);
+    if ($disp_owner_name ne '' || $disp_group_name ne '') {
+        my $name_label = $text{'posix_base_names'} || 'user/group';
+        my $name_val = ($disp_owner_name || 'N/A')."/".($disp_group_name || 'N/A');
+        $posix_base_html .= "<br><span style='color:#666;font-size:90%'>".
+            &html_escape($name_label).": ".&html_escape($name_val).
+            "</span>";
+    }
+    print &ui_table_row($text{'posix_base'}, $posix_base_html);
+    my $acl_lines = get_acl_base_lines($info->{target});
+    if ($acl_lines && @$acl_lines) {
+        my $acl_html = join("<br>", map { &html_escape($_) } @$acl_lines);
+        print &ui_table_row($text{'acl_base_lines'} || 'ACL base lines',
+            "<span style='color:#666;font-size:90%'>".$acl_html."</span>");
+    }
+    print &ui_table_span("<b>$text{'acl_users'}</b><br>".$acl_select.$jail_info_html);
+    print &ui_table_span("<b>$text{'base_owner'}</b><br>".$owner_select);
+    print &ui_table_span("<b>$text{'base_group'}</b><br>".$group_select);
+    print &ui_table_end();
+
+        print "<script>\n".
+            "function zfsacl_update_modes(){\n".
+            "  var sel = document.getElementById('profile_set');\n".
+            "  if(!sel) return;\n".
+            "  var v = sel.value;\n".
+            "  var txt = 'file=644 dir=775';\n".
+            "  if (v === 'EXEC') { txt = 'file=755 dir=775'; }\n".
+            "  else if (v === 'JAILMEDIA') { txt = 'file=664 dir=2775'; }\n".
+            "  else if (v === 'JAILEXEC') { txt = 'file=775 dir=2775'; }\n".
+            "  var cmf = document.getElementById('custom_mode_file');\n".
+            "  var cmd = document.getElementById('custom_mode_dir');\n".
+            "  var defs = { 'MEDIA': { file: '644', dir: '775' }, 'EXEC': { file: '755', dir: '775' }, 'JAILMEDIA': { file: '664', dir: '2775' }, 'JAILEXEC': { file: '775', dir: '2775' } };\n".
+            "  var def = defs[v] || defs['MEDIA'];\n".
+            "  if (cmf && cmf.value === '' && cmf.dataset.userEdited !== '1') { cmf.value = def.file; }\n".
+            "  if (cmd && cmd.value === '' && cmd.dataset.userEdited !== '1') { cmd.value = def.dir; }\n".
+            "  if (cmf && cmf.value !== '') { txt = 'file='+cmf.value+' dir='+(cmd && cmd.value ? cmd.value : txt.split(' dir=')[1]); }\n".
+            "  else if (cmd && cmd.value !== '') { txt = 'file='+txt.split(' file=')[1].split(' ')[0]+' dir='+cmd.value; }\n".
+            "  var span = document.getElementById('posix_modes_val');\n".
+            "  if(span) span.textContent = txt;\n".
+            "  var visible = true;\n".
+            "  var juid = document.getElementById('jail_uid_row');\n".
+            "  var jgid = document.getElementById('jail_gid_row');\n".
+            "  if (juid) { juid.style.display = visible ? '' : 'none'; }\n".
+            "  if (jgid) { jgid.style.display = visible ? '' : 'none'; }\n".
+            "  var p = document.getElementsByName('profile');\n".
+            "  if(p && p.length){ for(var i=0;i<p.length;i++){ p[i].value = v; } }\n".
+            "  var f = sel.form;\n".
+            "  if (f) {\n".
+            "    if (typeof zfsacl_update_submit === 'function') { zfsacl_update_submit(f); }\n".
+            "    profile_update_props(f, v);\n".
+            "  }\n".
+            "}\n".
+          "function zfsacl_target_update(f, source){\n".
+          "  if(!f) return;\n".
+          "  var ds = f.elements['target_dataset'];\n".
+          "  var mp = f.elements['target_path'];\n".
+          "  if(source === 'dataset'){\n".
+          "    if(mp){ mp.value = ''; }\n".
+          "  }\n".
+          "  else if(source === 'manual'){\n".
+          "    if(ds){ ds.selectedIndex = 0; }\n".
+          "  }\n".
+          "  var tgt = f.elements['target'];\n".
+          "  if(!tgt){\n".
+          "    tgt = document.createElement('input');\n".
+          "    tgt.type = 'hidden';\n".
+          "    tgt.name = 'target';\n".
+          "    tgt.id = 'target';\n".
+          "    f.appendChild(tgt);\n".
+          "  }\n".
+          "  if(mp && mp.value !== ''){\n".
+          "    tgt.value = mp.value;\n".
+          "  }\n".
+          "  else if(ds && ds.value !== ''){\n".
+          "    tgt.value = ds.value;\n".
+          "  }\n".
+          "  else {\n".
+          "    tgt.value = '';\n".
+          "  }\n".
+          "}\n".
+          "function zfsacl_target_submit(f){\n".
+          "  if(!f) return true;\n".
+          "  var ds = f.elements['target_dataset'];\n".
+          "  var mp = f.elements['target_path'];\n".
+          "  if(mp && mp.value !== '' && ds){\n".
+          "    ds.selectedIndex = 0;\n".
+          "  }\n".
+          "  return true;\n".
+          "}\n".
+          "function profile_update_props(f, v){\n".
+          "  if(!f) return;\n".
+          "  var params = [];\n".
+          "  params.push('update_props=1');\n".
+          "  var t = f.elements['target'];\n".
+          "  if(t && t.value !== undefined){ params.push('target='+encodeURIComponent(t.value)); }\n".
+          "  params.push('profile_set='+encodeURIComponent(v || ''));\n".
+          "  var acl = f.elements['acl_users_set'];\n".
+          "  if(acl && acl.value !== undefined){ params.push('acl_users_set='+encodeURIComponent(acl.value)); }\n".
+          "  var juid = f.elements['jail_uid'];\n".
+          "  if (juid && juid.value !== undefined){ params.push('jail_uid='+encodeURIComponent(juid.value)); }\n".
+          "  var jgid = f.elements['jail_gid'];\n".
+          "  if (jgid && jgid.value !== undefined){ params.push('jail_gid='+encodeURIComponent(jgid.value)); }\n".
+          "  var cmf = f.elements['custom_mode_file'];\n".
+          "  if (cmf && cmf.value !== undefined){ params.push('custom_mode_file='+encodeURIComponent(cmf.value)); }\n".
+          "  var cmd = f.elements['custom_mode_dir'];\n".
+          "  if (cmd && cmd.value !== undefined){ params.push('custom_mode_dir='+encodeURIComponent(cmd.value)); }\n".
+          "  for(var i=0;i<f.elements.length;i++){\n".
+          "    var e = f.elements[i];\n".
+          "    if(!e || !e.name) continue;\n".
+          "    if(e.name.indexOf('zfs_') === 0){\n".
+          "      params.push(encodeURIComponent(e.name)+'='+encodeURIComponent(e.value));\n".
+          "    }\n".
+          "  }\n".
+          "  if (window.fetch) {\n".
+          "    fetch('index.cgi', {\n".
+          "      method: 'POST',\n".
+          "      headers: {'Content-Type':'application/x-www-form-urlencoded'},\n".
+          "      body: params.join('&')\n".
+          "    });\n".
+          "  }\n".
+          "}\n".
+          "function zfs_props_update_state(f){\n".
+          "  if(!f) return;\n".
+          "  var params = [];\n".
+          "  params.push('update_state=1');\n".
+          "  var t = f.elements['target'];\n".
+          "  if(t && t.value !== undefined){ params.push('target='+encodeURIComponent(t.value)); }\n".
+          "  for(var i=0;i<f.elements.length;i++){\n".
+          "    var e = f.elements[i];\n".
+          "    if(!e || !e.name) continue;\n".
+          "    if(e.name.indexOf('zfs_') === 0){\n".
+          "      params.push(encodeURIComponent(e.name)+'='+encodeURIComponent(e.value));\n".
+          "    }\n".
+          "  }\n".
+          "  if (window.fetch) {\n".
+          "    fetch('index.cgi', {\n".
+          "      method: 'POST',\n".
+          "      headers: {'Content-Type':'application/x-www-form-urlencoded'},\n".
+          "      body: params.join('&')\n".
+          "    });\n".
+          "  }\n".
+          "}\n".
+          "function zfsacl_update_submit(f){\n".
+          "  acl_users_update_hidden(f);\n".
+          "  base_owner_update_hidden(f);\n".
+          "  base_group_update_hidden(f);\n".
+          "  return true;\n".
+          "}\n".
+          "function acl_users_update_hidden(f){\n".
+          "  if(!f || !f.elements['acl_users_left']) return;\n".
+          "  var left = f.elements['acl_users_left'];\n".
+          "  var vals = [];\n".
+          "  for(var i=0;i<left.options.length;i++){ vals.push(left.options[i].value); }\n".
+          "  if(f.elements['acl_users_set']){ f.elements['acl_users_set'].value = vals.join(\"\\n\"); }\n".
+          "  var u = document.getElementsByName('users');\n".
+          "  if(u && u.length){ for(var j=0;j<u.length;j++){ u[j].value = vals.join(' '); } }\n".
+          "}\n".
+          "function acl_users_update_property(f){\n".
+          "  if(!f) return;\n".
+          "  var t = f.elements['target'];\n".
+          "  if(!t || !t.value) return;\n".
+          "  var v = f.elements['acl_users_set'] ? f.elements['acl_users_set'].value : '';\n".
+          "  var params = [];\n".
+          "  params.push('update_acl_users=1');\n".
+          "  params.push('target='+encodeURIComponent(t.value));\n".
+          "  params.push('acl_users_set='+encodeURIComponent(v));\n".
+          "  if (window.fetch) {\n".
+          "    fetch('index.cgi', {\n".
+          "      method: 'POST',\n".
+          "      headers: {'Content-Type':'application/x-www-form-urlencoded'},\n".
+          "      body: params.join('&')\n".
+          "    });\n".
+          "  }\n".
+          "}\n".
+          "function acl_users_move(f, dir){\n".
+          "  var left = f.elements['acl_users_left'];\n".
+          "  var right = f.elements['acl_users_right'];\n".
+          "  if(!left || !right) return;\n".
+          "  var from = dir ? right : left;\n".
+          "  var to = dir ? left : right;\n".
+          "  for(var i=0;i<from.options.length;i++){\n".
+          "    var o = from.options[i];\n".
+          "    if(o.selected){ o.selected=false; to.add(o, 0); i--; }\n".
+          "  }\n".
+          "  acl_users_update_hidden(f);\n".
+          "  acl_users_update_property(f);\n".
+          "}\n".
+          "function base_owner_update_hidden(f){\n".
+          "  if(!f || !f.elements['base_owner_left']) return;\n".
+          "  var left = f.elements['base_owner_left'];\n".
+          "  var vals = [];\n".
+          "  for(var i=0;i<left.options.length;i++){ vals.push(left.options[i].value); }\n".
+          "  if(f.elements['base_owner']){ f.elements['base_owner'].value = vals.join(\"\\n\"); }\n".
+          "  var all = document.getElementsByName('base_owner');\n".
+          "  if(all && all.length){ for(var j=0;j<all.length;j++){ all[j].value = vals.join(\"\\n\"); } }\n".
+          "}\n".
+          "function base_posix_update_state(f){\n".
+          "  if(!f) return;\n".
+          "  var t = f.elements['target'];\n".
+          "  if(!t || !t.value) return;\n".
+          "  var bo = f.elements['base_owner'] ? f.elements['base_owner'].value : '';\n".
+          "  var bg = f.elements['base_group'] ? f.elements['base_group'].value : '';\n".
+          "  var params = [];\n".
+          "  params.push('update_state=1');\n".
+          "  params.push('target='+encodeURIComponent(t.value));\n".
+          "  params.push('base_owner='+encodeURIComponent(bo));\n".
+          "  params.push('base_group='+encodeURIComponent(bg));\n".
+          "  if (window.fetch) {\n".
+          "    fetch('index.cgi', {\n".
+          "      method: 'POST',\n".
+          "      headers: {'Content-Type':'application/x-www-form-urlencoded'},\n".
+          "      body: params.join('&')\n".
+          "    });\n".
+          "  }\n".
+          "}\n".
+          "function base_owner_move(f, dir){\n".
+          "  var left = f.elements['base_owner_left'];\n".
+          "  var right = f.elements['base_owner_right'];\n".
+          "  if(!left || !right) return;\n".
+          "  if(dir){\n".
+          "    var sel = null;\n".
+          "    for(var i=0;i<right.options.length;i++){ if(right.options[i].selected){ sel = right.options[i]; break; } }\n".
+          "    if(!sel) return;\n".
+          "    for(var j=0;j<left.options.length;j++){ var o = left.options[j]; o.selected=false; right.add(o, 0); j--; }\n".
+          "    sel.selected=false; left.add(sel, 0);\n".
+          "  }\n".
+          "  else{\n".
+          "    for(var k=0;k<left.options.length;k++){\n".
+          "      var o2 = left.options[k];\n".
+          "      if(o2.selected){ o2.selected=false; right.add(o2, 0); k--; }\n".
+          "    }\n".
+          "  }\n".
+          "  base_owner_update_hidden(f);\n".
+          "  base_posix_update_state(f);\n".
+          "}\n".
+          "function base_group_update_hidden(f){\n".
+          "  if(!f || !f.elements['base_group_left']) return;\n".
+          "  var left = f.elements['base_group_left'];\n".
+          "  var vals = [];\n".
+          "  for(var i=0;i<left.options.length;i++){ vals.push(left.options[i].value); }\n".
+          "  if(f.elements['base_group']){ f.elements['base_group'].value = vals.join(\"\\n\"); }\n".
+          "  var all = document.getElementsByName('base_group');\n".
+          "  if(all && all.length){ for(var j=0;j<all.length;j++){ all[j].value = vals.join(\"\\n\"); } }\n".
+          "}\n".
+          "function base_group_move(f, dir){\n".
+          "  var left = f.elements['base_group_left'];\n".
+          "  var right = f.elements['base_group_right'];\n".
+          "  if(!left || !right) return;\n".
+          "  if(dir){\n".
+          "    var sel = null;\n".
+          "    for(var i=0;i<right.options.length;i++){ if(right.options[i].selected){ sel = right.options[i]; break; } }\n".
+          "    if(!sel) return;\n".
+          "    for(var j=0;j<left.options.length;j++){ var o = left.options[j]; o.selected=false; right.add(o, 0); j--; }\n".
+          "    sel.selected=false; left.add(sel, 0);\n".
+          "  }\n".
+          "  else{\n".
+          "    for(var k=0;k<left.options.length;k++){\n".
+          "      var o2 = left.options[k];\n".
+          "      if(o2.selected){ o2.selected=false; right.add(o2, 0); k--; }\n".
+          "    }\n".
+          "  }\n".
+          "  base_group_update_hidden(f);\n".
+          "  base_posix_update_state(f);\n".
+          "}\n".
+          "function toggle_rights_fields(f){\n".
+          "  if(!f || !f.elements['mode']) return;\n".
+          "  var show = (f.elements['mode'].value === 'user_rights');\n".
+          "  var r1 = document.getElementById('rights_row');\n".
+          "  var r2 = document.getElementById('rights_flags_row');\n".
+          "  if(r1) r1.style.display = show ? '' : 'none';\n".
+          "  if(r2) r2.style.display = show ? '' : 'none';\n".
+          "}\n".
+          "if (window.addEventListener) {\n".
+          "  window.addEventListener('load', function(){\n".
+          "    var forms = document.forms;\n".
+          "    var f = forms && forms.length ? forms[forms.length-1] : null;\n".
+          "    toggle_rights_fields(f);\n".
+          "  });\n".
+          "}\n".
+          "</script>\n";
+
+    my $zfs_props;
+    if ($info->{dataset}) {
+        $zfs_props = zfs_props_for_dataset($info->{dataset});
+        my $zfs_opts = zfs_prop_options();
+        my $zfs_rec = zfs_prop_recommended();
+        my $rec_label = $text{'recommended_smb'} || 'recommended for use with SMB';
+        print &ui_table_start($text{'zfs_props'}, undef, 2);
+        foreach my $p (@$zfs_props) {
+            my ($key, $val) = @$p;
+            my $cell;
+            if ($zfs_opts->{$key}) {
+                my @opt_list;
+                foreach my $opt (@{ $zfs_opts->{$key} }) {
+                    my $label = $opt;
+                    if ($zfs_rec->{$key} && $zfs_rec->{$key}->{$opt}) {
+                        $label .= " ($rec_label)";
+                    }
+                    push @opt_list, [ $opt, $label ];
+                }
+                $cell = &ui_select("zfs_$key", $val, \@opt_list, 1, 0, 1, $has_ds ? 0 : 1,
+                    "onchange='zfs_props_update_state(this.form)'");
+            }
+            else {
+                $cell = &html_escape($val);
+            }
+            print &ui_table_row($key, $cell);
+        }
+        print &ui_table_end();
+    }
+
+    # Persist current UI selections on every render so Run doesn't depend on Save
+    my $state_profile = ($profile_sel && $profile_sel eq 'EXEC') ? 'EXEC' : 'MEDIA';
+    my $state_acl_users = join(" ", @acl_selected);
+    my $state_base_owner = join(" ", @base_owner_sel);
+    my $state_base_group = join(" ", @base_group_sel);
+    state_set('target', $target);
+    state_set('profile', $state_profile);
+    state_set('acl_users', $state_acl_users);
+    state_set('base_owner', $state_base_owner);
+    state_set('base_group', $state_base_group);
+    my $zfs_opts = zfs_prop_options();
+    if ($zfs_props) {
+        my %cur = map { $_->[0] => $_->[1] } @$zfs_props;
+        foreach my $p (keys %$zfs_opts) {
+            my $k = "zfs_".$p;
+            my $v = (defined $in{$k} && $in{$k} ne '') ? $in{$k} : $cur{$p};
+            state_set($k, $v) if (defined $v && $v ne '');
         }
     }
-    $status =~ s/\s+/ /g;
-    $status =~ s/^\s+|\s+$//g;
+    else {
+        foreach my $p (keys %$zfs_opts) {
+            my $k = "zfs_".$p;
+            if (defined $in{$k} && $in{$k} ne '') {
+                state_set($k, $in{$k});
+            }
+        }
+    }
+    state_save();
+    print &ui_form_end([ [ 'save', $text{'save'} ] ]);
 
-    if ($state ne '' && uc($state) ne 'ONLINE') {
-        return (1, $status || "state: $state");
-    }
-    if ($status =~ /\b(?:degraded|fault|error|offline|unavail|removed|corrupt|suspended|insufficient)\b/i) {
-        return (1, $status);
-    }
-    return (0, $status);
+    my $reset_label = ($text{'mode_reset'} || 'Reset ACL').
+        " <span style='color:#c00'>(Removes users!)</span>";
+    my @mode_opts = (
+        [ 'reset',      $reset_label ],
+        [ 'add',        $text{'mode_add'} ],
+        [ 'remove',     $text{'mode_remove'} ],
+        [ 'audit_acl',  $text{'mode_audit_acl'} ],
+        [ 'audit_posix',$text{'mode_audit_posix'} ],
+        [ 'user_rights',$text{'mode_user_rights'} ],
+    );
+    my @rights_opts = (
+        [ 'add',    $text{'rights_add'} ],
+        [ 'revoke', $text{'rights_revoke'} ],
+    );
+    my @profile_opts = (
+        [ 'AUTO',  $text{'profile_auto'} ],
+        [ 'MEDIA', $text{'profile_media'} ],
+        [ 'EXEC',  $text{'profile_exec'} ],
+        [ 'NONE',  $text{'profile_none'} ],
+    );
+
+    print &ui_form_start('apply.cgi', 'post');
+    print &ui_hidden('target', $info->{target});
+    my $effective_profile = $profile_sel;
+    my $users_val = join(' ', @acl_selected);
+    my $cross_default = defined $in{'cross_mounts'} ? $in{'cross_mounts'} : 0;
+    print &ui_hidden('users', $users_val);
+    print &ui_hidden('profile', $effective_profile);
+    print &ui_hidden('base_owner', join("\n", @base_owner_sel));
+    print &ui_hidden('base_group', join("\n", @base_group_sel));
+    print &ui_hidden('jail_uid', $jail_uid);
+    print &ui_hidden('jail_gid', $jail_gid);
+    print &ui_hidden('cross_mounts', $cross_default);
+    print &ui_table_start($text{'menu'}, undef, 2);
+    print &ui_table_row($text{'mode'},
+        &ui_select('mode', $in{'mode'} || 'audit_posix', \@mode_opts, 1, 0, 0, 0,
+            "onchange='toggle_rights_fields(this.form)'"));
+    my $rec_default = defined $in{'recursive'} ? $in{'recursive'} : 1;
+    print &ui_table_row($text{'recursive'},
+        &ui_yesno_radio('recursive', $rec_default));
+    print &ui_table_row($text{'cross_mounts'},
+        &ui_yesno_radio('cross_mounts', $cross_default));
+    my $snap_default = defined $in{'snapshot'} ? $in{'snapshot'} : 0;
+    my $snap_disabled = ($info->{type} eq 'FILESYSTEM' && $info->{dataset}) ? 0 : 1;
+    print &ui_table_row($text{'snapshot'},
+        &ui_yesno_radio('snapshot', $snap_default, 1, 0, $snap_disabled));
+    print &ui_table_row($text{'dryrun'},
+        &ui_yesno_radio('dryrun', $in{'dryrun'} || 0));
+    my $keep_default = defined $in{'keep_logs'} ? $in{'keep_logs'} : 0;
+    print &ui_table_row($text{'keep_logs'} || 'Keep logs',
+        &ui_yesno_radio('keep_logs', $keep_default));
+    my $rights_label = ($text{'rights'} || 'Rights action').
+        " <span style='color:#666;font-size:90%'>(Applied on ACL user(s) listed in the window above!)</span>";
+    print &ui_table_row($rights_label,
+        &ui_select('rights', $in{'rights'} || 'add', \@rights_opts), 1, undef,
+        [ "id='rights_row' style='display:none'", "" ]);
+    my $rights_flags = join(' ',
+        &ui_checkbox('write', 1, $text{'write'}, $in{'write'}),
+        &ui_checkbox('delete', 1, $text{'delete'}, $in{'delete'}),
+        &ui_checkbox('execute', 1, $text{'execute'}, $in{'execute'}),
+        &ui_checkbox('create_missing', 1, $text{'create_missing'}, $in{'create_missing'}));
+    $rights_flags .= "<div style='color:#666;font-size:90%'>".
+        "Hint: Rights modify existing ACL user entries. ".
+        "Enable &quot;".$text{'create_missing'}."&quot; if a user has no ACE.".
+        "</div>";
+    print &ui_table_row($text{'rights_flags'}, $rights_flags, 1, undef,
+        [ "id='rights_flags_row' style='display:none'", "" ]);
+    print &ui_table_end();
+    print &ui_form_end([ [ 'run', $text{'run'} ] ]);
 }
+
+&ui_print_footer('/', $text{'title'});
